@@ -37,7 +37,7 @@
       --grad-t:   linear-gradient(135deg, #C4B5FD, #818CF8, #67E8F9);
     }
     
-    html { height: 100%; }
+    html { height: 100%; -webkit-text-size-adjust: 100%; }
     body {
       min-height: 100%;
       background: var(--bg);
@@ -45,6 +45,10 @@
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     
     /* Ambient background glow */
@@ -119,7 +123,48 @@
       align-items: start;
     }
     @media (max-width: 680px) {
-      .main-grid { grid-template-columns: 1fr; }
+      .app { padding: 8px 10px 40px; }
+      .header { padding: 6px 0 14px; gap: 8px; }
+      .h-left { gap: 8px; }
+      .h-icon { width: 36px; height: 36px; font-size: 18px; border-radius: 10px; }
+      .h-title { font-size: 17px; }
+      .h-sub { font-size: 9.5px; }
+      .h-right { gap: 6px; }
+      #btn-header-train { padding: 6px 10px; font-size: 11.5px; }
+      .badge { padding: 4px 10px; font-size: 10px; }
+      .main-grid { grid-template-columns: 1fr; gap: 12px; }
+      .cam-wrap { aspect-ratio: 4/3; max-height: 48vh; border-radius: 16px 16px 0 0; }
+      .cam-bar { padding: 8px 10px; gap: 6px; }
+      .cam-bar .btn-ic { width: 44px; height: 44px; font-size: 16px; border-radius: 11px; }
+      #btn-train { height: 44px; padding: 0 12px; font-size: 12px; }
+      #btn-stop { height: 44px; padding: 0 16px; font-size: 13px; }
+      .set-bar { padding: 10px 12px; font-size: 12px; }
+      .det-card { padding: 16px; border-radius: 18px; }
+      .big-wrap { min-height: 85px; margin: 0 0 4px; }
+      #big-l { font-size: 90px; }
+      #sign-desc { font-size: 12.5px; min-height: 18px; }
+      .sent-card { padding: 16px; border-radius: 18px; }
+      .sent-btns .btn-ic { width: 42px; height: 42px; font-size: 16px; }
+      .sent-box { font-size: 17px; min-height: 52px; padding: 10px 12px; }
+      .q-btns { gap: 8px; margin-top: 12px; }
+      .q-btn {
+        flex: 1 1 calc(50% - 6px);
+        min-height: 46px;
+        padding: 10px 12px;
+        font-size: 13px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .q-btn:active {
+        transform: scale(0.96);
+        background: var(--P-glow);
+        border-color: var(--P);
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
     }
     
     /* ─── CARD ───────────────────────────────────────────── */
@@ -856,6 +901,15 @@ function sendToMobile(type, data) {
   }
 }
 
+function triggerHaptic(type = 'letter') {
+  sendToMobile('HAPTIC', { type });
+  try {
+    if (navigator.vibrate) {
+      navigator.vibrate(type === 'tap' ? 22 : 45);
+    }
+  } catch (e) {}
+}
+
 let audioCtx = null;
 function playConfirmChime() {
   try {
@@ -1152,6 +1206,7 @@ function addLetter(l) {
   totalLetters++;
   renderSentence();
   playConfirmChime();
+  triggerHaptic('letter');
   sendToMobile('LETTER_ADDED', l);
   bigL.classList.remove('pop');
   void bigL.offsetWidth; // reflow
@@ -1600,18 +1655,20 @@ function showToast(msg) {
 // ─────────────────────────────────────────────────────────────
 //  EVENTS
 // ─────────────────────────────────────────────────────────────
-document.getElementById('btn-start').addEventListener('click', startCam);
-document.getElementById('btn-retry').addEventListener('click', startCam);
-document.getElementById('btn-stop').addEventListener('click', stopCam);
-document.getElementById('btn-flip').addEventListener('click', flipCam);
+document.getElementById('btn-start').addEventListener('click', () => { triggerHaptic('tap'); startCam(); });
+document.getElementById('btn-retry').addEventListener('click', () => { triggerHaptic('tap'); startCam(); });
+document.getElementById('btn-stop').addEventListener('click', () => { triggerHaptic('tap'); stopCam(); });
+document.getElementById('btn-flip').addEventListener('click', () => { triggerHaptic('tap'); flipCam(); });
 
 document.getElementById('btn-pause').addEventListener('click', function() {
+  triggerHaptic('tap');
   paused = !paused;
   this.textContent = paused ? '▶' : '⏸';
   showToast(paused ? 'Detection paused' : 'Detection resumed');
 });
 
 document.getElementById('btn-skel').addEventListener('click', function() {
+  triggerHaptic('tap');
   showSkeleton = !showSkeleton;
   this.style.opacity = showSkeleton ? '1' : '0.35';
   if (!showSkeleton && hc.width) ctx.clearRect(0, 0, hc.width, hc.height);
@@ -1619,6 +1676,7 @@ document.getElementById('btn-skel').addEventListener('click', function() {
 });
 
 document.getElementById('btn-tts').addEventListener('click', () => {
+  triggerHaptic('tap');
   const textToSpeak = sentence.trim();
   if (!textToSpeak) { showToast('Nothing to speak'); return; }
   
@@ -1641,6 +1699,7 @@ document.getElementById('btn-tts').addEventListener('click', () => {
 });
 
 document.getElementById('btn-copy').addEventListener('click', async () => {
+  triggerHaptic('tap');
   if (!sentence.trim()) { showToast('Nothing to copy'); return; }
   try {
     await navigator.clipboard.writeText(sentence.trim());
@@ -1651,6 +1710,7 @@ document.getElementById('btn-copy').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-clear').addEventListener('click', () => {
+  triggerHaptic('tap');
   sentence = ''; totalLetters = 0;
   renderSentence();
   stL.textContent = '0'; stW.textContent = '0';
@@ -1816,14 +1876,15 @@ btnResetAll?.addEventListener('click', () => {
 // Initial render
 renderTrainPills();
 
-document.getElementById('qb-space').addEventListener('click', () => { sentence += ' '; renderSentence(); });
+document.getElementById('qb-space').addEventListener('click', () => { triggerHaptic('tap'); sentence += ' '; renderSentence(); });
 document.getElementById('qb-del').addEventListener('click', () => {
+  triggerHaptic('tap');
   sentence = sentence.slice(0, -1);
   if (totalLetters > 0) totalLetters--;
   renderSentence();
 });
-document.getElementById('qb-j').addEventListener('click', () => addLetter('J'));
-document.getElementById('qb-z').addEventListener('click', () => addLetter('Z'));
+document.getElementById('qb-j').addEventListener('click', () => { triggerHaptic('tap'); addLetter('J'); });
+document.getElementById('qb-z').addEventListener('click', () => { triggerHaptic('tap'); addLetter('Z'); });
 
 document.getElementById('dwell-range').addEventListener('input', function() {
   dwellMs = parseInt(this.value);

@@ -336,8 +336,34 @@
     }
     .tips strong { color: var(--ink); }
     
-    /* ─── REFERENCE ──────────────────────────────────────── */
-    .ref-wrap { margin-top: 20px; }
+    /* ─── TRAINING PANEL ────────────────────────────────────── */
+    .train-panel {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(5,6,9,0.98);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 24px; padding: 20px; text-align: center;
+      backdrop-filter: blur(12px);
+    }
+    .train-panel.open { display: flex; }
+    .train-card {
+      background: var(--s1); border: 1px solid var(--bdr);
+      border-radius: 24px; padding: 32px;
+      max-width: 400px; width: 100%;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+    .train-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+    .train-desc { font-size: 14px; color: var(--ink2); margin-bottom: 24px; line-height: 1.6; }
+    .train-select {
+      width: 100%; padding: 12px; background: var(--s2);
+      color: var(--ink); border: 1px solid var(--bdr);
+      border-radius: 12px; font-size: 16px; font-weight: 600;
+      margin-bottom: 20px; outline: none;
+    }
+    .train-actions { display: flex; gap: 12px; justify-content: center; }
+    .btn-capture { background: var(--P); color: #fff; padding: 14px 24px; }
+    .btn-close { background: var(--s2); color: var(--ink2); }
+
     .ref-head {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--s1); border: 1px solid var(--bdr);
@@ -459,9 +485,11 @@
           <button class="btn btn-gh btn-ic" id="btn-flip"  title="Flip camera">🔄</button>
           <button class="btn btn-gh btn-ic" id="btn-pause" title="Pause detection">⏸</button>
           <button class="btn btn-gh btn-ic" id="btn-skel"  title="Toggle skeleton overlay" style="font-size:15px">🦴</button>
+          <button class="btn btn-gh btn-ic" id="btn-train" title="Calibration / Training Mode">🎓</button>
           <div class="flex1"></div>
           <button class="btn btn-rd" id="btn-stop">■&nbsp; Stop</button>
         </div>
+
 
         <!-- Dwell settings bar -->
         <div class="set-bar" id="set-bar" style="display:none">
@@ -549,7 +577,21 @@
     </div>
   </div>
 
-</div><!-- /app -->
+  <!-- ── TRAINING PANEL ── -->
+  <div class="train-panel" id="train-panel">
+    <div class="train-card">
+      <div class="train-title">Calibration Mode</div>
+      <div class="train-desc">Sign a letter, select it below, and capture it to teach the AI your personal style.</div>
+      <select class="train-select" id="train-letter">
+        <!-- A-Z will be populated by JS -->
+      </select>
+      <div class="train-actions">
+        <button class="btn btn-P btn-capture" id="btn-capture">📸 Capture Pose</button>
+        <button class="btn btn-gh btn-close" id="btn-train-close">Close</button>
+      </div>
+    </div>
+  </div>
+
 <div id="toast"></div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
@@ -629,6 +671,10 @@ let sentence = '';
 let totalLetters = 0;
 let frameCount = 0, fpsLast = Date.now(), fps = 0;
 
+// Calibration / Training
+let USER_SAMPLES = JSON.parse(localStorage.getItem('signwing_samples') || '{}');
+function saveSamples() { localStorage.setItem('signwing_samples', JSON.stringify(USER_SAMPLES)); }
+
 // Dwell
 let dwellMs = 1500;
 let dwellLetter = null, dwellStart = null;
@@ -680,6 +726,23 @@ const d2 = (a,b) => {
   return Math.sqrt(dx*dx + dy*dy);
 };
 
+function getNormalizedPose(lm, ps) {
+  const wrist = lm[0];
+  return lm.map(p => ({
+    x: (p.x - wrist.x) / ps,
+    y: (p.y - wrist.y) / ps,
+    z: (p.z - wrist.z) / ps
+  }));
+}
+
+function calculatePoseDistance(p1, p2) {
+  let dist = 0;
+  for (let i = 0; i < 21; i++) {
+    dist += d3(p1[i], p2[i]);
+  }
+  return dist / 21;
+}
+
 // ─────────────────────────────────────────────────────────────
 // -----------------------------------------------------------------
 //  ASL CLASSIFIER  (v2 -- rotation-invariant, score-based)
@@ -699,6 +762,19 @@ function classify(lm) {
   if (!lm || lm.length < 21) return { letter:'?', conf:0 };
   const ps = d3(lm[0], lm[9]); // Palm size (Wrist to Middle MCP)
   if (ps < 0.04) return { letter:'?', conf:0 };
+
+  // 0. USER CALIBRATION CHECK
+  const currentPose = getNormalizedPose(lm, ps);
+  let bestSampleLetter = '?', minSampleDist = Infinity;
+  for (const [letter, samplePose] of Object.entries(USER_SAMPLES)) {
+    const dist = calculatePoseDistance(currentPose, samplePose);
+    if (dist < minSampleDist) { minSampleDist = dist; bestSampleLetter = letter; }
+  }
+  // If we found a very close match in user samples, prioritize it
+  if (bestSampleLetter !== '?' && minSampleDist < 0.15) {
+    const conf = Math.max(0.7, 1 - minSampleDist * 2);
+    return { letter: bestSampleLetter, conf };
+  }
 
   // 1. GEOMETRIC CURLS (Rotation-Invariant)
   const gc = (a, b, c, e) => {
@@ -977,6 +1053,7 @@ function loop() {
         const res = landmarker.detectForVideo(vid, performance.now());
         if (res.landmarks?.length > 0) {
           const lm = res.landmarks[0];
+          window.lastLm = lm; // Store for calibration
           drawHand(lm, W, H);
 
           const raw = classify(lm);
@@ -1165,6 +1242,44 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   renderSentence();
   stL.textContent = '0'; stW.textContent = '0';
   showToast('Cleared');
+});
+
+// Calibration / Training Events
+const trainPanel = document.getElementById('train-panel');
+const trainSelect = document.getElementById('train-letter');
+
+// Populate A-Z in select
+'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(l => {
+  const opt = document.createElement('option');
+  opt.value = l; opt.textContent = l;
+  trainSelect.appendChild(opt);
+});
+
+document.getElementById('btn-train').addEventListener('click', () => {
+  trainPanel.classList.add('open');
+});
+
+document.getElementById('btn-train-close').addEventListener('click', () => {
+  trainPanel.classList.remove('open');
+});
+
+document.getElementById('btn-capture').addEventListener('click', () => {
+  // Use the current detection landmarks if available
+  // We need access to the last detected landmarks
+  // Let's use a global variable to store them
+  if (!window.lastLm) {
+    showToast('No hand detected! Please sign first.');
+    return;
+  }
+  const ps = d3(window.lastLm[0], window.lastLm[9]);
+  if (ps < 0.04) {
+    showToast('Hand too far or small!');
+    return;
+  }
+  const letter = trainSelect.value;
+  USER_SAMPLES[letter] = getNormalizedPose(window.lastLm, ps);
+  saveSamples();
+  showToast(`✓ Calibrated: ${letter}`);
 });
 
 document.getElementById('qb-space').addEventListener('click', () => { sentence += ' '; renderSentence(); });

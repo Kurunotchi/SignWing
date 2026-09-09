@@ -336,33 +336,130 @@
     }
     .tips strong { color: var(--ink); }
     
-    /* ─── TRAINING PANEL ────────────────────────────────────── */
+    /* ─── TRAINING / CALIBRATION MODAL ────────────────────── */
     .train-panel {
       position: fixed; inset: 0; z-index: 1000;
-      background: rgba(5,6,9,0.98);
-      display: none; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 24px; padding: 20px; text-align: center;
-      backdrop-filter: blur(12px);
+      background: rgba(5, 6, 9, 0.70);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+      animation: fadeIn 0.2s ease-out;
     }
     .train-panel.open { display: flex; }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
     .train-card {
-      background: var(--s1); border: 1px solid var(--bdr);
-      border-radius: 24px; padding: 32px;
-      max-width: 400px; width: 100%;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      background: rgba(17, 19, 32, 0.96);
+      border: 1px solid rgba(99, 102, 241, 0.28);
+      border-radius: 24px; padding: 26px 28px;
+      max-width: 520px; width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.65), 0 0 30px rgba(99,102,241,0.15);
+      position: relative;
+      animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 90vh;
+      overflow-y: auto;
     }
-    .train-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
-    .train-desc { font-size: 14px; color: var(--ink2); margin-bottom: 24px; line-height: 1.6; }
-    .train-select {
-      width: 100%; padding: 12px; background: var(--s2);
-      color: var(--ink); border: 1px solid var(--bdr);
-      border-radius: 12px; font-size: 16px; font-weight: 600;
-      margin-bottom: 20px; outline: none;
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(18px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
-    .train-actions { display: flex; gap: 12px; justify-content: center; }
-    .btn-capture { background: var(--P); color: #fff; padding: 14px 24px; }
-    .btn-close { background: var(--s2); color: var(--ink2); }
+    .train-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 14px; gap: 12px;
+    }
+    .train-title-wrap { text-align: left; }
+    .train-title {
+      font-size: 20px; font-weight: 800; letter-spacing: -0.02em;
+      background: var(--grad-t);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .train-desc { font-size: 12.5px; color: var(--ink2); line-height: 1.5; margin-top: 3px; }
+    .train-close-x {
+      background: var(--s2); border: 1px solid var(--bdr);
+      color: var(--ink2); width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.15s; flex-shrink: 0; font-size: 14px;
+    }
+    .train-close-x:hover { background: var(--s3); color: var(--ink); border-color: var(--bdr-hi); }
+    
+    /* Live hand status banner */
+    .train-status-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--s2); border: 1px solid var(--bdr);
+      border-radius: 14px; padding: 10px 14px; margin-bottom: 16px;
+      font-size: 12px; font-weight: 600;
+    }
+    .train-status-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 6px; vertical-align: middle;
+    }
+    .train-status-ready { color: var(--G); }
+    .train-status-ready .train-status-dot { background: var(--G); box-shadow: 0 0 8px var(--G); }
+    .train-status-warn { color: var(--A); }
+    .train-status-warn .train-status-dot { background: var(--A); }
+    .train-status-off { color: var(--ink3); }
+    .train-status-off .train-status-dot { background: var(--ink3); }
+    
+    /* Letter Selector Pills */
+    .train-pills-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--ink3); margin-bottom: 8px;
+      text-align: left; display: flex; justify-content: space-between;
+    }
+    .train-pills-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
+      gap: 6px; margin-bottom: 16px; max-height: 130px; overflow-y: auto;
+      padding: 4px 2px;
+    }
+    .train-pill {
+      background: var(--s2); border: 1px solid var(--bdr);
+      border-radius: 8px; padding: 7px 0; font-size: 13px; font-weight: 700;
+      color: var(--ink2); cursor: pointer; transition: all 0.12s ease;
+      position: relative; text-align: center; user-select: none;
+    }
+    .train-pill:hover { background: var(--s3); color: var(--ink); border-color: var(--bdr-hi); }
+    .train-pill.active {
+      background: var(--P); color: #fff; border-color: var(--P);
+      box-shadow: 0 0 12px rgba(99,102,241,0.5);
+    }
+    .train-pill.calibrated::after {
+      content: '✓'; position: absolute; top: -3px; right: -2px;
+      font-size: 9px; font-weight: 900; background: var(--G);
+      color: #000; width: 13px; height: 13px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+    
+    /* Selected Letter Action Box */
+    .train-active-box {
+      background: var(--s0); border: 1px solid var(--bdr);
+      border-radius: 16px; padding: 14px 18px; margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .train-active-l { font-size: 32px; font-weight: 900; color: var(--P); line-height: 1; min-width: 32px; text-align: center; }
+    .train-active-info { text-align: left; flex: 1; }
+    .train-active-name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+    .train-active-status { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+    
+    /* Action buttons */
+    .train-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-capture {
+      flex: 1; background: var(--grad); color: #fff; border: none;
+      padding: 12px 20px; font-size: 14px; font-weight: 700; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 4px 18px rgba(99,102,241,0.35); cursor: pointer; transition: all 0.15s;
+    }
+    .btn-capture:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-reset-sign { background: var(--s2); color: var(--ink2); border: 1px solid var(--bdr); cursor: pointer; }
+    .btn-reset-sign:hover { background: rgba(239,68,68,0.12); color: var(--R); border-color: rgba(239,68,68,0.25); }
+    .btn-reset-all {
+      background: transparent; color: var(--ink3); border: none; font-size: 11.5px;
+      text-decoration: underline; cursor: pointer; margin-top: 14px; display: inline-block;
+    }
+    .btn-reset-all:hover { color: var(--R); }
 
     .ref-head {
       display: flex; align-items: center; justify-content: space-between;
@@ -440,9 +537,15 @@
         <div class="h-sub">American Sign Language · A – Z</div>
       </div>
     </div>
-    <div class="badge badge-green">
-      <div class="dot"></div>
-      <span>On-Device AI</span>
+    <div class="h-right" style="display:flex; align-items:center; gap:10px;">
+      <button class="btn btn-gh btn-sm" id="btn-header-train" title="Calibrate AI with your custom signing poses" style="display:inline-flex; align-items:center; gap:7px; padding:7px 15px; font-weight:700; font-size:12.5px; border-color:var(--bdr-hi); background:rgba(99,102,241,0.12); color:#C4B5FD; cursor:pointer;">
+        <span>🎯</span>
+        <span>Calibrate AI</span>
+      </button>
+      <div class="badge badge-green">
+        <div class="dot"></div>
+        <span>On-Device AI</span>
+      </div>
     </div>
   </header>
 
@@ -461,7 +564,10 @@
             <div class="ov-emoji">📷</div>
             <div class="ov-title">Ready to Translate</div>
             <div class="ov-desc">Point your camera at your signing hand. Recognizes all 26 ASL letters A–Z in real time using on-device AI — nothing is uploaded.</div>
-            <button class="btn btn-P btn-lg" id="btn-start">▶&nbsp;&nbsp;Start Camera</button>
+            <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:4px;">
+              <button class="btn btn-P btn-lg" id="btn-start">▶&nbsp;&nbsp;Start Camera</button>
+              <button class="btn btn-gh btn-lg" id="btn-idle-train" style="border-color:var(--bdr-hi); font-weight:700; cursor:pointer;">🎯&nbsp;&nbsp;Calibrate Signs</button>
+            </div>
           </div>
 
           <!-- Loading overlay -->
@@ -485,7 +591,9 @@
           <button class="btn btn-gh btn-ic" id="btn-flip"  title="Flip camera">🔄</button>
           <button class="btn btn-gh btn-ic" id="btn-pause" title="Pause detection">⏸</button>
           <button class="btn btn-gh btn-ic" id="btn-skel"  title="Toggle skeleton overlay" style="font-size:15px">🦴</button>
-          <button class="btn btn-gh btn-ic" id="btn-train" title="Calibration / Training Mode">🎓</button>
+          <button class="btn btn-gh" id="btn-train" title="Calibration / Training Mode" style="display:inline-flex; align-items:center; gap:6px; padding:0 12px; font-size:12.5px; font-weight:700;">
+            <span>🎯</span><span>Calibrate</span>
+          </button>
           <div class="flex1"></div>
           <button class="btn btn-rd" id="btn-stop">■&nbsp; Stop</button>
         </div>
@@ -577,17 +685,61 @@
     </div>
   </div>
 
-  <!-- ── TRAINING PANEL ── -->
+</div><!-- /app -->
+
+  <!-- ── TRAINING / CALIBRATION MODAL ── -->
   <div class="train-panel" id="train-panel">
     <div class="train-card">
-      <div class="train-title">Calibration Mode</div>
-      <div class="train-desc">Sign a letter, select it below, and capture it to teach the AI your personal style.</div>
-      <select class="train-select" id="train-letter">
-        <!-- A-Z will be populated by JS -->
-      </select>
+      <div class="train-header">
+        <div class="train-title-wrap">
+          <div class="train-title">🎯 AI Sign Calibration</div>
+          <div class="train-desc">Record custom hand poses so the AI recognizes your personal signing style.</div>
+        </div>
+        <button class="train-close-x" id="btn-train-close" title="Close calibration">✕</button>
+      </div>
+
+      <!-- Live Hand Status Bar -->
+      <div class="train-status-bar" id="train-status-bar">
+        <div id="train-hand-state" class="train-status-off">
+          <span class="train-status-dot"></span>
+          <span id="train-hand-text">Camera stopped — click Start</span>
+        </div>
+        <div id="train-live-det" style="color:var(--ink2); font-size:12px;">
+          Detected: <strong id="train-live-letter" style="color:var(--P);">-</strong>
+        </div>
+      </div>
+
+      <!-- Letter Selector Pills -->
+      <div class="train-pills-label">
+        <span>Select Sign to Calibrate</span>
+        <span id="train-count-badge" style="color:var(--ink2); font-weight:700;">0/26 Calibrated</span>
+      </div>
+      <div class="train-pills-grid" id="train-pills">
+        <!-- A-Z pills generated by JS -->
+      </div>
+
+      <!-- Active Selection Detail -->
+      <div class="train-active-box">
+        <div class="train-active-l" id="train-cur-letter">A</div>
+        <div class="train-active-info">
+          <div class="train-active-name" id="train-cur-name">Letter A</div>
+          <div class="train-active-status" id="train-cur-status">Using default geometric model</div>
+        </div>
+        <button class="btn btn-sm btn-reset-sign" id="btn-clear-letter" title="Clear calibration for this letter" style="display:none; padding:6px 12px; font-size:12px;">
+          🗑️ Clear
+        </button>
+      </div>
+
+      <!-- Actions -->
       <div class="train-actions">
-        <button class="btn btn-P btn-capture" id="btn-capture">📸 Capture Pose</button>
-        <button class="btn btn-gh btn-close" id="btn-train-close">Close</button>
+        <button class="btn-capture" id="btn-capture">
+          <span>📸</span>
+          <span id="btn-capture-text">Capture Pose for "A"</span>
+        </button>
+      </div>
+
+      <div style="text-align:center;">
+        <button class="btn-reset-all" id="btn-reset-all" type="button">Reset all custom calibrations to default</button>
       </div>
     </div>
   </div>
@@ -770,9 +922,9 @@ function classify(lm) {
     const dist = calculatePoseDistance(currentPose, samplePose);
     if (dist < minSampleDist) { minSampleDist = dist; bestSampleLetter = letter; }
   }
-  // If we found a very close match in user samples, prioritize it
-  if (bestSampleLetter !== '?' && minSampleDist < 0.15) {
-    const conf = Math.max(0.7, 1 - minSampleDist * 2);
+  // If we found a close match in user samples, prioritize it
+  if (bestSampleLetter !== '?' && minSampleDist < 0.22) {
+    const conf = Math.max(0.75, 1 - minSampleDist * 2);
     return { letter: bestSampleLetter, conf };
   }
 
@@ -1075,9 +1227,12 @@ function loop() {
           } else {
             noHand();
           }
+          updateTrainLive(lm, raw);
         } else {
           ctx.clearRect(0, 0, W, H);
+          window.lastLm = null;
           noHand();
+          updateTrainLive(null, null);
         }
       } catch(e) { console.warn('detect error', e); }
     }
@@ -1174,6 +1329,7 @@ function stopCam() {
   setDwell(0);
   paused = false;
   document.getElementById('btn-pause').textContent = '⏸';
+  updateTrainLive(null, null);
 }
 
 async function flipCam() {
@@ -1244,43 +1400,164 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   showToast('Cleared');
 });
 
-// Calibration / Training Events
-const trainPanel = document.getElementById('train-panel');
-const trainSelect = document.getElementById('train-letter');
+// ─────────────────────────────────────────────────────────────
+//  CALIBRATION / TRAINING UI & EVENTS
+// ─────────────────────────────────────────────────────────────
+const trainPanel      = document.getElementById('train-panel');
+const trainPills      = document.getElementById('train-pills');
+const trainHandState  = document.getElementById('train-hand-state');
+const trainHandText   = document.getElementById('train-hand-text');
+const trainLiveLetter = document.getElementById('train-live-letter');
+const trainCountBadge = document.getElementById('train-count-badge');
+const trainCurLetter  = document.getElementById('train-cur-letter');
+const trainCurName    = document.getElementById('train-cur-name');
+const trainCurStatus  = document.getElementById('train-cur-status');
+const btnClearLetter  = document.getElementById('btn-clear-letter');
+const btnCapture      = document.getElementById('btn-capture');
+const btnCaptureText  = document.getElementById('btn-capture-text');
+const btnResetAll     = document.getElementById('btn-reset-all');
 
-// Populate A-Z in select
-'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(l => {
-  const opt = document.createElement('option');
-  opt.value = l; opt.textContent = l;
-  trainSelect.appendChild(opt);
-});
+let selectedLetter = 'A';
 
-document.getElementById('btn-train').addEventListener('click', () => {
+function updateTrainLive(lm, raw) {
+  if (!trainPanel || !trainPanel.classList.contains('open')) return;
+  if (lm && raw) {
+    const ps = d3(lm[0], lm[9]);
+    if (ps < 0.04) {
+      trainHandState.className = 'train-status-warn';
+      trainHandText.textContent = '⚠️ Hand too small / far away';
+    } else {
+      trainHandState.className = 'train-status-ready';
+      trainHandText.textContent = '🟢 Hand detected & ready';
+    }
+    trainLiveLetter.textContent = raw.letter !== '?' ? `${raw.letter} (${Math.round(raw.conf * 100)}%)` : 'Unknown sign';
+  } else {
+    trainHandState.className = 'train-status-off';
+    trainHandText.textContent = mediaStream ? '🔴 No hand in view' : 'Camera off — click Start';
+    trainLiveLetter.textContent = '-';
+  }
+}
+
+function selectTrainLetter(l) {
+  selectedLetter = l;
+  trainCurLetter.textContent = l;
+  trainCurName.textContent = `Letter ${l} — ${SIGNS[l] || 'ASL Sign'}`;
+  btnCaptureText.textContent = `Capture Pose for "${l}"`;
+  
+  if (USER_SAMPLES[l]) {
+    trainCurStatus.textContent = '✓ Custom pose active (overriding default model)';
+    trainCurStatus.style.color = 'var(--G)';
+    btnClearLetter.style.display = 'inline-block';
+  } else {
+    trainCurStatus.textContent = 'Using default geometric model';
+    trainCurStatus.style.color = 'var(--ink3)';
+    btnClearLetter.style.display = 'none';
+  }
+
+  // Update pill selection
+  document.querySelectorAll('.train-pill').forEach(pill => {
+    pill.classList.toggle('active', pill.dataset.letter === l);
+  });
+}
+
+function renderTrainPills() {
+  trainPills.innerHTML = '';
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  let calCount = 0;
+  letters.forEach(l => {
+    const pill = document.createElement('div');
+    pill.className = 'train-pill';
+    pill.dataset.letter = l;
+    pill.textContent = l;
+    if (USER_SAMPLES[l]) {
+      pill.classList.add('calibrated');
+      calCount++;
+    }
+    if (l === selectedLetter) {
+      pill.classList.add('active');
+    }
+    pill.addEventListener('click', () => selectTrainLetter(l));
+    trainPills.appendChild(pill);
+  });
+  trainCountBadge.textContent = `${calCount}/26 Calibrated`;
+}
+
+function openTrainModal() {
   trainPanel.classList.add('open');
-});
+  renderTrainPills();
+  selectTrainLetter(selectedLetter);
+  // Auto-start camera if stopped
+  if (!mediaStream && !paused) {
+    startCam();
+  }
+}
 
-document.getElementById('btn-train-close').addEventListener('click', () => {
+function closeTrainModal() {
   trainPanel.classList.remove('open');
+}
+
+// Open triggers
+document.getElementById('btn-header-train')?.addEventListener('click', openTrainModal);
+document.getElementById('btn-idle-train')?.addEventListener('click', openTrainModal);
+document.getElementById('btn-train')?.addEventListener('click', openTrainModal);
+
+// Close triggers
+document.getElementById('btn-train-close')?.addEventListener('click', closeTrainModal);
+trainPanel?.addEventListener('click', (e) => {
+  if (e.target === trainPanel) closeTrainModal();
 });
 
-document.getElementById('btn-capture').addEventListener('click', () => {
-  // Use the current detection landmarks if available
-  // We need access to the last detected landmarks
-  // Let's use a global variable to store them
+// Capture action
+btnCapture?.addEventListener('click', () => {
+  if (!mediaStream) {
+    startCam();
+    showToast('Starting camera first…');
+    return;
+  }
   if (!window.lastLm) {
-    showToast('No hand detected! Please sign first.');
+    showToast('No hand detected! Please hold your hand in view.');
     return;
   }
   const ps = d3(window.lastLm[0], window.lastLm[9]);
   if (ps < 0.04) {
-    showToast('Hand too far or small!');
+    showToast('Hand too far or small! Bring hand closer.');
     return;
   }
-  const letter = trainSelect.value;
-  USER_SAMPLES[letter] = getNormalizedPose(window.lastLm, ps);
+  USER_SAMPLES[selectedLetter] = getNormalizedPose(window.lastLm, ps);
   saveSamples();
-  showToast(`✓ Calibrated: ${letter}`);
+  renderTrainPills();
+  selectTrainLetter(selectedLetter);
+  showToast(`✓ Calibrated: Letter ${selectedLetter}`);
 });
+
+// Clear letter action
+btnClearLetter?.addEventListener('click', () => {
+  if (USER_SAMPLES[selectedLetter]) {
+    delete USER_SAMPLES[selectedLetter];
+    saveSamples();
+    renderTrainPills();
+    selectTrainLetter(selectedLetter);
+    showToast(`Reset "${selectedLetter}" to default model`);
+  }
+});
+
+// Reset all action
+btnResetAll?.addEventListener('click', () => {
+  if (Object.keys(USER_SAMPLES).length === 0) {
+    showToast('No custom calibrations saved.');
+    return;
+  }
+  if (confirm('Reset all custom calibrations back to default?')) {
+    USER_SAMPLES = {};
+    saveSamples();
+    renderTrainPills();
+    selectTrainLetter(selectedLetter);
+    showToast('All custom calibrations cleared.');
+  }
+});
+
+// Initial render
+renderTrainPills();
 
 document.getElementById('qb-space').addEventListener('click', () => { sentence += ' '; renderSentence(); });
 document.getElementById('qb-del').addEventListener('click', () => {

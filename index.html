@@ -582,7 +582,9 @@
             <div class="ov-emoji">⚠️</div>
             <div class="ov-title" id="err-t">Camera Error</div>
             <div class="ov-desc" id="err-m">Could not access camera.</div>
-            <button class="btn btn-P" id="btn-retry">↺&nbsp; Try Again</button>
+            <div id="err-advice" style="font-size:12px; color:#cbd5e1; max-width:340px; line-height:1.5; background:rgba(255,255,255,0.06); padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); margin-top:4px; text-align:left;"></div>
+            <div id="err-debug" style="font-size:10.5px; color:#f87171; font-family:monospace; margin-top:4px; word-break:break-all; max-width:340px; background:rgba(0,0,0,0.4); padding:6px 10px; border-radius:6px;"></div>
+            <button class="btn btn-P" id="btn-retry" style="margin-top:6px;">↺&nbsp; Try Again</button>
           </div>
         </div>
 
@@ -1338,32 +1340,35 @@ async function startCam() {
       throw new Error('Camera access is not supported by this browser/context. Please open this page via HTTPS or localhost.');
     }
 
-    // Try camera access with progressive fallbacks
     let stream = null;
-    const reqConstraints = [
-      { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-      { video: { facingMode: { ideal: facingMode }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
-      { video: { facingMode: { ideal: facingMode } }, audio: false },
-      { video: true, audio: false }
-    ];
-
-    let lastErr = null;
-    for (const c of reqConstraints) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+    } catch (e1) {
+      console.warn('High-res camera constraints failed, attempting fallback...', e1);
+      if (e1.name === 'NotAllowedError' || e1.name === 'PermissionDeniedError') {
+        throw e1;
+      }
       try {
-        const streamPromise = navigator.mediaDevices.getUserMedia(c);
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Camera request timed out')), 9000)
-        );
-        stream = await Promise.race([streamPromise, timeoutPromise]);
-        if (stream) break;
-      } catch (e) {
-        lastErr = e;
-        if (e.name === 'NotAllowedError') break; // User blocked permissions, don't loop
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facingMode } },
+          audio: false,
+        });
+      } catch (e2) {
+        if (e2.name === 'NotAllowedError' || e2.name === 'PermissionDeniedError') {
+          throw e2;
+        }
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
       }
     }
 
     if (!stream) {
-      throw lastErr || new Error('Could not access camera device.');
+      throw new Error('Could not obtain camera stream.');
     }
 
     mediaStream = stream;
@@ -1418,17 +1423,64 @@ async function startCam() {
 
   } catch (err) {
     hide(ovLoad); show(ovErr);
-    if (err.name === 'NotAllowedError') {
-      errT.textContent = 'Camera Access Denied';
-      errM.textContent = 'Please allow camera permission in your browser/app settings, then tap Try Again.';
-    } else if (err.name === 'NotFoundError') {
-      errT.textContent = 'No Camera Found';
-      errM.textContent = 'No camera device was detected on this device.';
+    const errName = err.name || 'Error';
+    const errMsg = err.message || 'Unable to start camera.';
+    console.error('Camera startup failure:', err);
+
+    // Send error report to React Native host app
+    sendToMobile('CAMERA_ERROR', {
+      name: errName,
+      message: errMsg,
+      isSecureContext: window.isSecureContext,
+      hasMediaDevices: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+      protocol: window.location.protocol,
+      hostname: window.location.hostname
+    });
+
+    const isDenied = errName === 'NotAllowedError' || errName === 'PermissionDeniedError' ||
+      errMsg.toLowerCase().includes('permission') || errMsg.toLowerCase().includes('denied');
+    const isNotFound = errName === 'NotFoundError' || errMsg.toLowerCase().includes('not found');
+    const isBusy = errName === 'NotReadableError' || errMsg.toLowerCase().includes('could not start video source') || errMsg.toLowerCase().includes('in use');
+    const isInsecure = !window.isSecureContext || window.location.protocol === 'file:';
+
+    const errAdvice = document.getElementById('err-advice');
+    const errDebug = document.getElementById('err-debug');
+
+    if (isDenied) {
+      errT.textContent = 'Camera Permission Needed';
+      errM.textContent = 'Camera permission has not been granted.';
+      if (errAdvice) {
+        errAdvice.innerHTML = '📱 <strong>On Mobile (Expo Go):</strong><br>Go to your phone\'s <em>Settings &gt; Apps &gt; Expo Go &gt; Permissions &gt; Camera</em> and choose <strong>"Allow"</strong>.<br><br>💻 <strong>In Web Browser:</strong><br>Click the camera/padlock icon at the left of the URL bar and select <strong>"Allow camera"</strong>.';
+      }
+    } else if (isInsecure) {
+      errT.textContent = 'HTTPS Required';
+      errM.textContent = 'Browsers block camera access on non-secure connections.';
+      if (errAdvice) {
+        errAdvice.innerHTML = 'Please open using <strong>https://</strong> (<a href="https://kurunotchi.github.io/SignWing/" target="_blank" style="color:#38bdf8">https://kurunotchi.github.io/SignWing/</a>) or <strong>http://localhost:8000</strong>.';
+      }
+    } else if (isBusy) {
+      errT.textContent = 'Camera is Busy';
+      errM.textContent = 'Another application is using your webcam.';
+      if (errAdvice) {
+        errAdvice.innerHTML = 'Please close any other app using your camera (Zoom, Teams, Camera app, OBS, or other browser tabs) and tap Try Again.';
+      }
+    } else if (isNotFound) {
+      errT.textContent = 'No Camera Detected';
+      errM.textContent = 'No camera device was found.';
+      if (errAdvice) {
+        errAdvice.innerHTML = 'Ensure your webcam or mobile camera is connected and not disabled in system device settings.';
+      }
     } else {
       errT.textContent = 'Camera Error';
-      errM.textContent = err.message || 'Unable to start camera.';
+      errM.textContent = errMsg;
+      if (errAdvice) {
+        errAdvice.innerHTML = 'If running in Expo Go, check <em>Settings &gt; Apps &gt; Expo Go &gt; Permissions</em> to verify Camera permission is enabled.';
+      }
     }
-    console.error(err);
+
+    if (errDebug) {
+      errDebug.textContent = `[${errName}] ${errMsg}`;
+    }
   }
 }
 

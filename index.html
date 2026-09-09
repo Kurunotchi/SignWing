@@ -833,6 +833,40 @@ let dwellLetter = null, dwellStart = null;
 let lastConfirmed = 0;
 const COOLDOWN = 900; // ms
 
+// ─────────────────────────────────────────────────────────────
+//  MOBILE APP BRIDGE & AUDIO CHIME
+// ─────────────────────────────────────────────────────────────
+function sendToMobile(type, data) {
+  if (window.ReactNativeWebView) {
+    try {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type, data }));
+    } catch (e) {
+      console.warn('sendToMobile error', e);
+    }
+  }
+}
+
+let audioCtx = null;
+function playConfirmChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!audioCtx) audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.18);
+  } catch (e) {}
+}
+
 // Smoothing history
 const HIST = 10;
 const history = [];
@@ -1107,6 +1141,8 @@ function addLetter(l) {
   sentence += l;
   totalLetters++;
   renderSentence();
+  playConfirmChime();
+  sendToMobile('LETTER_ADDED', l);
   bigL.classList.remove('pop');
   void bigL.offsetWidth; // reflow
   bigL.classList.add('pop');
@@ -1375,11 +1411,24 @@ document.getElementById('btn-skel').addEventListener('click', function() {
 });
 
 document.getElementById('btn-tts').addEventListener('click', () => {
-  if (!sentence.trim()) { showToast('Nothing to speak'); return; }
-  const u = new SpeechSynthesisUtterance(sentence.trim());
-  u.rate = 0.88;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+  const textToSpeak = sentence.trim();
+  if (!textToSpeak) { showToast('Nothing to speak'); return; }
+  
+  // 1. Send to native mobile app via bridge (triggers native expo-speech on phone)
+  sendToMobile('SPEAK', textToSpeak);
+
+  // 2. Web Speech API (for desktop browsers)
+  try {
+    if ('speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(textToSpeak);
+      u.rate = 0.88;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    }
+  } catch (e) {
+    console.warn('SpeechSynthesis error', e);
+  }
+
   showToast('🔊 Speaking…');
 });
 
@@ -1577,22 +1626,6 @@ refHead.addEventListener('click', () => {
   refHead.classList.toggle('open');
   refBody.classList.toggle('open');
 });
-
-  // ─────────────────────────────────────────────────────────────
-  //  BRIDGE FOR MOBILE APP
-  // ─────────────────────────────────────────────────────────────
-  function sendToMobile(type, data) {
-    if (window.ReactNativeWebView) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type, data }));
-    }
-  }
-
-  // Hook into existing functions
-  const originalAddLetter = addLetter;
-  addLetter = (l) => {
-    originalAddLetter(l);
-    sendToMobile('LETTER_ADDED', l);
-  };
 
   // Also send real-time detections for the "Detected Sign" card
   setInterval(() => {

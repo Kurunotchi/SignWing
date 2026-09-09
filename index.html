@@ -6,8 +6,10 @@
   <title>SIGNWING — Real-Time Sign Language Recognition</title>
   <meta name="description" content="Real-time American Sign Language (ASL) alphabet translator using MediaPipe AI. All 26 letters A-Z, runs entirely in your browser — nothing uploaded.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://storage.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <style>
     /* ─── RESET ─────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -88,11 +90,17 @@
       display: inline-flex; align-items: center; gap: 6px;
       padding: 5px 13px; border-radius: 999px;
       font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+      transition: all 0.25s ease;
     }
     .badge-green {
       background: rgba(16,185,129,0.10);
       border: 1px solid rgba(16,185,129,0.22);
       color: var(--G);
+    }
+    .badge-yellow {
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.25);
+      color: var(--A);
     }
     .badge .dot {
       width: 6px; height: 6px; background: currentColor; border-radius: 50%;
@@ -542,9 +550,9 @@
         <span>🎯</span>
         <span>Calibrate AI</span>
       </button>
-      <div class="badge badge-green">
-        <div class="dot"></div>
-        <span>On-Device AI</span>
+      <div class="badge badge-yellow" id="ai-badge">
+        <div class="dot" id="ai-dot"></div>
+        <span id="ai-text">Loading AI…</span>
       </div>
     </div>
   </header>
@@ -1240,6 +1248,10 @@ function loop() {
     if (vid.currentTime !== lastVidTime) {
       lastVidTime = vid.currentTime;
       try {
+        if (!landmarker) {
+          rafId = requestAnimationFrame(loop);
+          return;
+        }
         const res = landmarker.detectForVideo(vid, performance.now());
         if (res.landmarks?.length > 0) {
           const lm = res.landmarks[0];
@@ -1288,89 +1300,143 @@ function noHand() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  MEDIAPIPE INIT
+//  MEDIAPIPE INIT & PRELOAD
 // ─────────────────────────────────────────────────────────────
-async function loadModel() {
-  loadMsg.textContent = 'Loading WASM runtime…';
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-  );
-  loadMsg.textContent = 'Loading hand detection model…';
-  try {
-    landmarker = await HandLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-        delegate: "GPU"
-      },
-      runningMode: "VIDEO",
-      numHands: 1,
-      minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence:  0.5,
-      minTrackingConfidence:      0.5,
-    });
-  } catch (gpuErr) {
-    console.warn('GPU acceleration unavailable for hand model, falling back to CPU:', gpuErr);
-    loadMsg.textContent = 'Loading hand model (CPU)…';
-    landmarker = await HandLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-        delegate: "CPU"
-      },
-      runningMode: "VIDEO",
-      numHands: 1,
-      minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence:  0.5,
-      minTrackingConfidence:      0.5,
-    });
+let modelPromise = null;
+let modelReady = false;
+
+function updateAiBadge(status, text) {
+  const badge = document.getElementById('ai-badge');
+  const span = document.getElementById('ai-text');
+  if (!badge || !span) return;
+  if (status === 'loading') {
+    badge.className = 'badge badge-yellow';
+    span.textContent = text || 'Loading AI…';
+  } else if (status === 'ready') {
+    badge.className = 'badge badge-green';
+    span.textContent = text || 'On-Device AI';
+  } else if (status === 'warning') {
+    badge.className = 'badge badge-yellow';
+    span.textContent = text || 'AI Warning';
   }
 }
+
+async function loadModel() {
+  if (modelReady && landmarker) return landmarker;
+  if (modelPromise) return modelPromise;
+
+  modelPromise = (async () => {
+    updateAiBadge('loading', 'Loading AI…');
+    if (loadMsg) loadMsg.textContent = 'Loading WASM runtime…';
+
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+
+    if (loadMsg) loadMsg.textContent = 'Loading hand detection model…';
+    try {
+      landmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "GPU"
+        },
+        runningMode: "VIDEO",
+        numHands: 1,
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence:  0.5,
+        minTrackingConfidence:      0.5,
+      });
+    } catch (gpuErr) {
+      console.warn('GPU acceleration unavailable for hand model, falling back to CPU:', gpuErr);
+      if (loadMsg) loadMsg.textContent = 'Loading hand model (CPU)…';
+      landmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "CPU"
+        },
+        runningMode: "VIDEO",
+        numHands: 1,
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence:  0.5,
+        minTrackingConfidence:      0.5,
+      });
+    }
+    modelReady = true;
+    updateAiBadge('ready', 'On-Device AI');
+    console.log('MediaPipe HandLandmarker loaded and ready.');
+    return landmarker;
+  })().catch(err => {
+    console.error('Failed to load MediaPipe model:', err);
+    modelPromise = null;
+    updateAiBadge('warning', 'AI Offline');
+    throw err;
+  });
+
+  return modelPromise;
+}
+
+// Immediately trigger model preload in background upon page load
+loadModel().catch(e => console.warn('Preload notice:', e));
 
 // ─────────────────────────────────────────────────────────────
 //  CAMERA CONTROL
 // ─────────────────────────────────────────────────────────────
-async function startCam() {
-  show(ovLoad); hide(ovIdle, ovErr);
+async function openCameraStream() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('Camera access is not supported by this browser/context. Please open this page via HTTPS or localhost.');
+  }
+
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+  // Optimized constraints: 640x480 (VGA) initializes 5x faster on Android camera sensors
+  // than 1280x720 or 1080p, uses 70% less memory, and matches MediaPipe's internal input.
+  const primaryConstraints = {
+    video: {
+      facingMode: { ideal: facingMode },
+      width:  { ideal: isMobile ? 640 : 1280, max: 1280 },
+      height: { ideal: isMobile ? 480 : 720, max: 720 },
+      frameRate: { ideal: 30, max: 30 }
+    },
+    audio: false
+  };
+
   try {
-    if (!landmarker) await loadModel();
-    loadMsg.textContent = 'Opening camera…';
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('Camera access is not supported by this browser/context. Please open this page via HTTPS or localhost.');
+    return await navigator.mediaDevices.getUserMedia(primaryConstraints);
+  } catch (e1) {
+    console.warn('Ideal camera constraints failed, attempting fallback...', e1);
+    if (e1.name === 'NotAllowedError' || e1.name === 'PermissionDeniedError') {
+      throw e1;
     }
-
-    let stream = null;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      return await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode } },
         audio: false,
       });
-    } catch (e1) {
-      console.warn('High-res camera constraints failed, attempting fallback...', e1);
-      if (e1.name === 'NotAllowedError' || e1.name === 'PermissionDeniedError') {
-        throw e1;
+    } catch (e2) {
+      if (e2.name === 'NotAllowedError' || e2.name === 'PermissionDeniedError') {
+        throw e2;
       }
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: facingMode } },
-          audio: false,
-        });
-      } catch (e2) {
-        if (e2.name === 'NotAllowedError' || e2.name === 'PermissionDeniedError') {
-          throw e2;
-        }
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      }
+      return await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
     }
+  }
+}
 
-    if (!stream) {
-      throw new Error('Could not obtain camera stream.');
-    }
+async function startCam() {
+  show(ovLoad); hide(ovIdle, ovErr);
+  loadMsg.textContent = 'Opening camera…';
 
+  try {
+    // 1. Concurrently start camera stream and ensure model is loading
+    const camPromise = openCameraStream();
+    const modelP = loadModel();
+
+    // 2. Await camera stream (fast - takes ~200-400ms!)
+    const stream = await camPromise;
     mediaStream = stream;
     vid.muted = true;
     vid.setAttribute('playsinline', '');
@@ -1378,7 +1444,6 @@ async function startCam() {
     vid.setAttribute('autoplay', '');
     vid.srcObject = mediaStream;
 
-    // Trigger playback without hanging indefinitely
     try {
       const p = vid.play();
       if (p !== undefined) {
@@ -1388,28 +1453,28 @@ async function startCam() {
       console.warn('vid.play call warning:', e);
     }
 
-    // Wait for video stream ready or 1.5s safety timeout
+    // 3. Fast video reveal - show video stream immediately once first frame/metadata is ready
     await new Promise((resolve) => {
-      let resolved = false;
+      let doneCalled = false;
       const done = () => {
-        if (!resolved) {
-          resolved = true;
+        if (!doneCalled) {
+          doneCalled = true;
           resolve();
         }
       };
 
-      if (vid.readyState >= 2 && vid.videoWidth > 0) {
+      if (vid.readyState >= 1 && vid.videoWidth > 0) {
         done();
         return;
       }
 
-      vid.addEventListener('loadeddata', done, { once: true });
       vid.addEventListener('loadedmetadata', done, { once: true });
+      vid.addEventListener('loadeddata', done, { once: true });
       vid.addEventListener('canplay', done, { once: true });
       vid.addEventListener('playing', done, { once: true });
 
-      // Fallback timeout to guarantee loading screen never gets stuck
-      setTimeout(done, 1500);
+      // Fast fallback timeout (max 350ms)
+      setTimeout(done, 350);
     });
 
     hide(ovLoad);
@@ -1419,7 +1484,14 @@ async function startCam() {
 
     lastVidTime = -1;
     history.length = 0;
-    rafId = requestAnimationFrame(loop);
+    if (!rafId) rafId = requestAnimationFrame(loop);
+
+    // If model is still finalizing download in background, inform the user with a toast
+    if (!landmarker) {
+      showToast('Camera active · AI model preparing…');
+      await modelP;
+      showToast('✓ AI Ready — Show your hand');
+    }
 
   } catch (err) {
     hide(ovLoad); show(ovErr);

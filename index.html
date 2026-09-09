@@ -1445,37 +1445,28 @@ async function openCameraStream() {
 
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
 
-  // Optimized constraints: 640x480 (VGA) initializes 5x faster on Android camera sensors
-  // than 1280x720 or 1080p, uses 70% less memory, and matches MediaPipe's internal input.
-  const primaryConstraints = {
-    video: {
-      facingMode: { ideal: facingMode },
-      width:  { ideal: isMobile ? 640 : 1280, max: 1280 },
-      height: { ideal: isMobile ? 480 : 720, max: 720 },
-      frameRate: { ideal: 30, max: 30 }
-    },
-    audio: false
-  };
-
+  // Progressive camera constraints: from ideal mobile resolution to bare minimum video stream
   try {
-    return await navigator.mediaDevices.getUserMedia(primaryConstraints);
+    return await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: facingMode },
+        width:  { ideal: isMobile ? 640 : 1280 },
+        height: { ideal: isMobile ? 480 : 720 }
+      },
+      audio: false
+    });
   } catch (e1) {
-    console.warn('Ideal camera constraints failed, attempting fallback...', e1);
-    if (e1.name === 'NotAllowedError' || e1.name === 'PermissionDeniedError') {
-      throw e1;
-    }
+    console.warn('Camera attempt 1 (ideal resolution) failed:', e1);
     try {
       return await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: facingMode } },
-        audio: false,
+        audio: false
       });
     } catch (e2) {
-      if (e2.name === 'NotAllowedError' || e2.name === 'PermissionDeniedError') {
-        throw e2;
-      }
+      console.warn('Camera attempt 2 (facingMode only) failed:', e2);
       return await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: false,
+        audio: false
       });
     }
   }

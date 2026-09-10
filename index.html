@@ -1396,6 +1396,35 @@ function updateAiBadge(status, text) {
   }
 }
 
+const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+async function getCachedModelAssetPath() {
+  if ('caches' in window) {
+    try {
+      const cache = await caches.open('signwing-model-cache');
+      let cachedResponse = await cache.match(MODEL_URL);
+      if (!cachedResponse && navigator.onLine) {
+        try {
+          const fetched = await fetch(MODEL_URL);
+          if (fetched.ok) {
+            await cache.put(MODEL_URL, fetched.clone());
+            cachedResponse = fetched;
+          }
+        } catch (e) {
+          console.warn('Network fetch for model cache failed:', e);
+        }
+      }
+      if (cachedResponse) {
+        const blob = await cachedResponse.blob();
+        return URL.createObjectURL(blob);
+      }
+    } catch (cacheErr) {
+      console.warn('Cache storage access warning:', cacheErr);
+    }
+  }
+  return MODEL_URL;
+}
+
 async function loadModel() {
   if (modelReady && landmarker) return landmarker;
   if (modelPromise) return modelPromise;
@@ -1409,11 +1438,12 @@ async function loadModel() {
     );
 
     if (loadMsg) loadMsg.textContent = 'Loading hand detection model…';
+    const modelAssetPath = await getCachedModelAssetPath();
+
     try {
       landmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          modelAssetPath: modelAssetPath,
           delegate: "GPU"
         },
         runningMode: "VIDEO",
@@ -1427,8 +1457,7 @@ async function loadModel() {
       if (loadMsg) loadMsg.textContent = 'Loading hand model (CPU)…';
       landmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          modelAssetPath: modelAssetPath,
           delegate: "CPU"
         },
         runningMode: "VIDEO",

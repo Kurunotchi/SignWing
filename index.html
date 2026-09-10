@@ -637,7 +637,10 @@
             <div class="ov-desc" id="err-m">Could not access camera.</div>
             <div id="err-advice" style="font-size:12px; color:#cbd5e1; max-width:340px; line-height:1.5; background:rgba(255,255,255,0.06); padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); margin-top:4px; text-align:left;"></div>
             <div id="err-debug" style="font-size:10.5px; color:#f87171; font-family:monospace; margin-top:4px; word-break:break-all; max-width:340px; background:rgba(0,0,0,0.4); padding:6px 10px; border-radius:6px;"></div>
-            <button class="btn btn-P" id="btn-retry" style="margin-top:6px;">↺&nbsp; Try Again</button>
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:8px;">
+              <button class="btn btn-P" id="btn-err-grant" style="background:#10B981; border:none; min-height:44px; padding:0 20px;">📱 Allow in App</button>
+              <button class="btn btn-gh" id="btn-retry" style="min-height:44px; padding:0 20px;">↺&nbsp; Try Again</button>
+            </div>
           </div>
         </div>
 
@@ -909,6 +912,23 @@ function triggerHaptic(type = 'letter') {
     }
   } catch (e) {}
 }
+
+window.sendToMobile = sendToMobile;
+
+// Forward console logs to React Native Metro terminal
+const origLog = console.log, origWarn = console.warn, origErr = console.error;
+function safeStr(args) {
+  return args.map(a => {
+    if (typeof a === 'object' && a !== null) {
+      if (a.message) return `${a.name || 'Error'}: ${a.message}`;
+      try { return JSON.stringify(a); } catch(e) { return String(a); }
+    }
+    return String(a);
+  }).join(' ');
+}
+console.log = function(...args) { origLog.apply(console, args); sendToMobile('LOG', safeStr(args)); };
+console.warn = function(...args) { origWarn.apply(console, args); sendToMobile('WARN', safeStr(args)); };
+console.error = function(...args) { origErr.apply(console, args); sendToMobile('ERROR', safeStr(args)); };
 
 let audioCtx = null;
 function playConfirmChime() {
@@ -1646,8 +1666,14 @@ function showToast(msg) {
 // ─────────────────────────────────────────────────────────────
 //  EVENTS
 // ─────────────────────────────────────────────────────────────
+window.startCam = startCam;
 document.getElementById('btn-start').addEventListener('click', () => { triggerHaptic('tap'); startCam(); });
 document.getElementById('btn-retry').addEventListener('click', () => { triggerHaptic('tap'); startCam(); });
+document.getElementById('btn-err-grant')?.addEventListener('click', () => {
+  triggerHaptic('tap');
+  sendToMobile('REQUEST_PERMISSION', {});
+  startCam();
+});
 document.getElementById('btn-stop').addEventListener('click', () => { triggerHaptic('tap'); stopCam(); });
 document.getElementById('btn-flip').addEventListener('click', () => { triggerHaptic('tap'); flipCam(); });
 
